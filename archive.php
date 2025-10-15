@@ -124,6 +124,10 @@ $total_pages = ceil($archiveData['total'] / $records_per_page);
             background: #2980b9;
         }
         
+        .nav-link.current {
+            background: #2c3e50;
+        }
+        
         .filters {
             background: #f8f9fa;
             padding: 20px;
@@ -227,6 +231,15 @@ $total_pages = ceil($archiveData['total'] / $records_per_page);
             font-size: 0.9em;
         }
         
+        .error {
+            background: #ffeaa7;
+            border: 1px solid #fdcb6e;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            color: #e17055;
+        }
+        
         @media (max-width: 768px) {
             .archive-table {
                 display: block;
@@ -236,6 +249,11 @@ $total_pages = ceil($archiveData['total'] / $records_per_page);
             .filters form {
                 flex-direction: column;
                 align-items: stretch;
+            }
+            
+            .nav-link {
+                display: block;
+                margin: 5px 0;
             }
         }
     </style>
@@ -250,16 +268,16 @@ $total_pages = ceil($archiveData['total'] / $records_per_page);
         <div class="navigation">
             <a href="index.php" class="nav-link">Current Weather</a>
             <a href="charts.php" class="nav-link">Weather Charts</a>
-            <a href="archive.php" class="nav-link">Data Archive</a>
+            <a href="archive.php" class="nav-link current">Data Archive</a>
         </div>
         
         <div class="filters">
             <form method="GET">
                 <label for="start_date">From Date:</label>
-                <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>">
+                <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>" max="<?php echo date('Y-m-d'); ?>">
                 
                 <label for="end_date">To Date:</label>
-                <input type="date" id="end_date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>">
+                <input type="date" id="end_date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>" max="<?php echo date('Y-m-d'); ?>">
                 
                 <button type="submit">Filter</button>
                 <a href="archive.php" style="padding: 8px 15px; background: #95a5a6; color: white; text-decoration: none; border-radius: 4px;">Clear</a>
@@ -275,7 +293,7 @@ $total_pages = ceil($archiveData['total'] / $records_per_page);
             <table class="archive-table">
                 <thead>
                     <tr>
-                        <th>Timestamp</th>
+                        <th>Timestamp (Chicago Time)</th>
                         <th>Temp (°F)</th>
                         <th>Humidity (%)</th>
                         <th>Wind Speed (mph)</th>
@@ -288,17 +306,21 @@ $total_pages = ceil($archiveData['total'] / $records_per_page);
                 </thead>
                 <tbody>
                     <?php foreach ($archiveData['data'] as $row): 
-                        // Convert wind direction to cardinal
+                        // Convert timestamp to Chicago time
+                        $dt = new DateTime($row['timestamp']);
+                        $dt->setTimezone(new DateTimeZone('America/Chicago'));
+                        $formatted_timestamp = $dt->format('M j, Y g:i A T');
+                        
+                        // Convert wind direction to cardinal using the function from config.php
                         $wind_dir = $row['wind_direction'];
-                        $directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-                        $wind_cardinal = $wind_dir !== null ? $directions[round($wind_dir / 22.5) % 16] : 'N/A';
+                        $wind_cardinal = getWindDirectionCardinal($wind_dir);
                     ?>
                         <tr>
-                            <td><?php echo date('M j, Y g:i A', strtotime($row['timestamp'])); ?></td>
+                            <td><?php echo $formatted_timestamp; ?></td>
                             <td><?php echo $row['temperature'] ?? 'N/A'; ?></td>
                             <td><?php echo $row['humidity'] ?? 'N/A'; ?></td>
                             <td><?php echo $row['wind_speed'] ?? '0.0'; ?></td>
-                            <td><?php echo $wind_cardinal . ($wind_dir ? ' (' . round($wind_dir) . '°)' : ''); ?></td>
+                            <td><?php echo $wind_cardinal . ($wind_dir !== null ? ' (' . round($wind_dir) . '°)' : ''); ?></td>
                             <td><?php echo $row['pressure'] ?? 'N/A'; ?></td>
                             <td><?php echo $row['dew_point'] ?? 'N/A'; ?></td>
                             <td><?php echo $row['visibility'] ?? 'N/A'; ?></td>
@@ -334,6 +356,26 @@ $total_pages = ceil($archiveData['total'] / $records_per_page);
             <div class="error">
                 <h2>No archive data available</h2>
                 <p>Weather data will be archived automatically when the current weather page is loaded.</p>
+                <p>Try selecting a different date range or check if the database is running properly.</p>
+                <p>Current database records start from: 
+                    <?php
+                    $database = new Database();
+                    $db = $database->getConnection();
+                    if ($db) {
+                        $stmt = $db->query("SELECT MIN(timestamp) as first_record FROM weather_readings");
+                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if ($result['first_record']) {
+                            $dt = new DateTime($result['first_record']);
+                            $dt->setTimezone(new DateTimeZone('America/Chicago'));
+                            echo $dt->format('M j, Y g:i A T');
+                        } else {
+                            echo 'No records yet';
+                        }
+                    } else {
+                        echo 'Database not available';
+                    }
+                    ?>
+                </p>
             </div>
         <?php endif; ?>
     </div>

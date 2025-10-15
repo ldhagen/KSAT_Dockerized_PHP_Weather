@@ -36,6 +36,22 @@ function getChartData($start_date, $end_date) {
 }
 
 $chartData = getChartData($start_date, $end_date);
+
+// Calculate statistics
+$stats = [];
+if (!empty($chartData)) {
+    $temps = array_column($chartData, 'temperature');
+    $humidities = array_column($chartData, 'humidity');
+    $winds = array_column($chartData, 'wind_speed');
+    $pressures = array_column($chartData, 'pressure');
+    
+    $stats = [
+        'Max Temp' => [max($temps) . '°F', '#e74c3c'],
+        'Min Temp' => [min($temps) . '°F', '#3498db'],
+        'Avg Humidity' => [round(array_sum($humidities) / count($humidities)) . '%', '#27ae60'],
+        'Max Wind' => [max($winds) . ' mph', '#f39c12']
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -97,6 +113,10 @@ $chartData = getChartData($start_date, $end_date);
         
         .nav-link:hover {
             background: #2980b9;
+        }
+        
+        .nav-link.current {
+            background: #2c3e50;
         }
         
         .date-filter {
@@ -191,6 +211,15 @@ $chartData = getChartData($start_date, $end_date);
             font-weight: 600;
         }
         
+        .error {
+            background: #ffeaa7;
+            border: 1px solid #fdcb6e;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            color: #e17055;
+        }
+        
         @media (max-width: 768px) {
             .chart-container {
                 grid-template-columns: 1fr;
@@ -198,6 +227,11 @@ $chartData = getChartData($start_date, $end_date);
             
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .nav-link {
+                display: block;
+                margin: 5px 0;
             }
         }
     </style>
@@ -211,19 +245,20 @@ $chartData = getChartData($start_date, $end_date);
         
         <div class="navigation">
             <a href="index.php" class="nav-link">Current Weather</a>
-            <a href="charts.php" class="nav-link">Weather Charts</a>
+            <a href="charts.php" class="nav-link current">Weather Charts</a>
             <a href="archive.php" class="nav-link">Data Archive</a>
         </div>
         
         <div class="date-filter">
             <form method="GET">
                 <label for="start_date">From:</label>
-                <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>" required>
+                <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>" max="<?php echo date('Y-m-d'); ?>" required>
                 
                 <label for="end_date">To:</label>
-                <input type="date" id="end_date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>" required>
+                <input type="date" id="end_date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>" max="<?php echo date('Y-m-d'); ?>" required>
                 
                 <button type="submit">Update Charts</button>
+                <button type="button" onclick="location.href='charts.php'">Reset</button>
             </form>
         </div>
         
@@ -251,21 +286,7 @@ $chartData = getChartData($start_date, $end_date);
             </div>
             
             <div class="stats-grid">
-                <?php
-                // Calculate statistics
-                $temps = array_column($chartData, 'temperature');
-                $humidities = array_column($chartData, 'humidity');
-                $winds = array_column($chartData, 'wind_speed');
-                $pressures = array_column($chartData, 'pressure');
-                
-                $stats = [
-                    'Max Temp' => [max($temps) . '°F', '#e74c3c'],
-                    'Min Temp' => [min($temps) . '°F', '#3498db'],
-                    'Avg Humidity' => [round(array_sum($humidities) / count($humidities)) . '%', '#27ae60'],
-                    'Max Wind' => [max($winds) . ' mph', '#f39c12']
-                ];
-                
-                foreach ($stats as $label => [$value, $color]): ?>
+                <?php foreach ($stats as $label => [$value, $color]): ?>
                     <div class="stat-card" style="border-left-color: <?php echo $color; ?>">
                         <div class="stat-value"><?php echo $value; ?></div>
                         <div class="stat-label"><?php echo $label; ?></div>
@@ -274,9 +295,11 @@ $chartData = getChartData($start_date, $end_date);
             </div>
             
             <script>
-                // Prepare chart data
+                // Prepare chart data with Chicago time
                 const labels = <?php echo json_encode(array_map(function($row) {
-                    return date('M j g:i A', strtotime($row['timestamp']));
+                    $dt = new DateTime($row['timestamp']);
+                    $dt->setTimezone(new DateTimeZone('America/Chicago'));
+                    return $dt->format('M j g:i A');
                 }, $chartData)); ?>;
                 
                 const temperatureData = <?php echo json_encode(array_column($chartData, 'temperature')); ?>;
@@ -383,6 +406,25 @@ $chartData = getChartData($start_date, $end_date);
             <div class="error">
                 <h2>No data available for the selected date range</h2>
                 <p>Please try selecting a different date range or check back later for more data.</p>
+                <p>Current database records start from: 
+                    <?php
+                    $database = new Database();
+                    $db = $database->getConnection();
+                    if ($db) {
+                        $stmt = $db->query("SELECT MIN(timestamp) as first_record FROM weather_readings");
+                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if ($result['first_record']) {
+                            $dt = new DateTime($result['first_record']);
+                            $dt->setTimezone(new DateTimeZone('America/Chicago'));
+                            echo $dt->format('M j, Y g:i A T');
+                        } else {
+                            echo 'No records yet';
+                        }
+                    } else {
+                        echo 'Database not available';
+                    }
+                    ?>
+                </p>
             </div>
         <?php endif; ?>
     </div>

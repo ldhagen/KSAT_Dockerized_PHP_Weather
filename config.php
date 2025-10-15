@@ -23,4 +23,27 @@ class Database {
         return $this->conn;
     }
 }
+
+// Utility functions
+function celsiusToFahrenheit($celsius) {
+    return $celsius ? round(($celsius * 9/5) + 32, 1) : null;
+}
+
+function formatTimestamp($timestamp) {
+    $dt = new DateTime($timestamp);
+    $dt->setTimezone(new DateTimeZone('America/Chicago'));
+    return $dt->format('g:i A T');
+}
+
+function getCurrentLocalTime() {
+    $dt = new DateTime('now', new DateTimeZone('America/Chicago'));
+    return $dt->format('g:i A T');
+}
+
+function getWindDirectionCardinal($degrees) {
+    if ($degrees === null) return 'N/A';
+    $directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    $index = round($degrees / 22.5) % 16;
+    return $directions[$index];
+}
 ?>
