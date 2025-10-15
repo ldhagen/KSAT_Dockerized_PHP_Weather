@@ -52,6 +52,62 @@ function fetchWeatherData($url, &$error = null) {
     return null;
 }
 
+// Database configuration
+class Database {
+    private $host = 'db';
+    private $db_name = 'weather_db';
+    private $username = 'weather_user';
+    private $password = 'weather_pass';
+    public $conn;
+
+    public function getConnection() {
+        $this->conn = null;
+        try {
+            $this->conn = new PDO(
+                "mysql:host=" . $this->host . ";dbname=" . $this->db_name, 
+                $this->username, 
+                $this->password
+            );
+            $this->conn->exec("set names utf8");
+            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch(PDOException $exception) {
+            error_log("Connection error: " . $exception->getMessage());
+        }
+        return $this->conn;
+    }
+}
+
+// Archive current reading to database
+function archiveWeatherData($weatherData, $conditions) {
+    try {
+        $database = new Database();
+        $db = $database->getConnection();
+        
+        if ($db) {
+            $query = "INSERT INTO weather_readings 
+                     (temperature, humidity, wind_speed, wind_direction, pressure, dew_point, visibility, conditions) 
+                     VALUES (:temp, :humidity, :wind_speed, :wind_dir, :pressure, :dew_point, :visibility, :conditions)";
+            
+            $stmt = $db->prepare($query);
+            
+            $stmt->bindParam(':temp', $weatherData['temperature']);
+            $stmt->bindParam(':humidity', $weatherData['humidity']);
+            $stmt->bindParam(':wind_speed', $weatherData['windSpeed']);
+            $stmt->bindParam(':wind_dir', $weatherData['windDirection']);
+            $stmt->bindParam(':pressure', $weatherData['pressure']);
+            $stmt->bindParam(':dew_point', $weatherData['dewPoint']);
+            $stmt->bindParam(':visibility', $weatherData['visibility']);
+            $stmt->bindParam(':conditions', $conditions);
+            
+            $stmt->execute();
+            return true;
+        }
+    } catch (Exception $e) {
+        error_log("Archive error: " . $e->getMessage());
+    }
+    return false;
+}
+
 // Get the observation station URL
 $errorMsg = '';
 $debugInfo = [];
@@ -152,6 +208,13 @@ if ($currentWeather && isset($currentWeather['properties'])) {
     }
     
     $debugInfo[] = "Final Wind Speed: " . ($weatherData['windSpeed'] ?? 'NULL');
+    
+    // Archive the current reading if we have valid data
+    if ($weatherData['temperature'] !== null) {
+        $conditions = $weatherData['conditions'] ?? 'Unknown';
+        $archiveResult = archiveWeatherData($weatherData, $conditions);
+        $debugInfo[] = "Archive: " . ($archiveResult ? "Success" : "Failed");
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -213,7 +276,7 @@ if ($currentWeather && isset($currentWeather['properties'])) {
         
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             border-bottom: 2px solid #e0e0e0;
             padding-bottom: 20px;
         }
@@ -228,6 +291,31 @@ if ($currentWeather && isset($currentWeather['properties'])) {
         .header p {
             font-size: 1.1em;
             color: #7f8c8d;
+        }
+        
+        .navigation {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .nav-link {
+            display: inline-block;
+            margin: 0 10px;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .nav-link:hover {
+            background: #2980b9;
+        }
+        
+        .nav-link.current {
+            background: #2c3e50;
         }
         
         .current-conditions {
@@ -410,6 +498,11 @@ if ($currentWeather && isset($currentWeather['properties'])) {
             .forecast-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+            
+            .nav-link {
+                display: block;
+                margin: 5px 0;
+            }
         }
         
         @media (max-width: 480px) {
@@ -428,6 +521,12 @@ if ($currentWeather && isset($currentWeather['properties'])) {
         <div class="header">
             <h1>ASAI Weather Dashboard</h1>
             <p>San Antonio, Texas - National Weather Service Data</p>
+        </div>
+        
+        <div class="navigation">
+            <a href="index.php" class="nav-link current">Current Weather</a>
+            <a href="charts.php" class="nav-link">Weather Charts</a>
+            <a href="archive.php" class="nav-link">Data Archive</a>
         </div>
         
         <?php if (!empty($weatherData)): ?>

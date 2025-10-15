@@ -1,3 +1,4 @@
+# docker-compose.yml
 version: '3.8'
 
 services:
@@ -9,4 +10,25 @@ services:
       - ./:/var/www/html
     environment:
       - TZ=America/Chicago
+      - DB_HOST=db
+      - DB_NAME=weather_db
+      - DB_USER=weather_user
+      - DB_PASS=weather_pass
+    depends_on:
+      - db
     restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_pass
+      - MYSQL_DATABASE=weather_db
+      - MYSQL_USER=weather_user
+      - MYSQL_PASSWORD=weather_pass
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+volumes:
+  db_data:
