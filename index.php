@@ -111,6 +111,9 @@ function archiveWeatherData($weatherData, $conditions) {
 // Get the observation station URL
 $errorMsg = '';
 $debugInfo = [];
+$debugInfo[] = "Script started at: " . date('Y-m-d H:i:s T');
+$debugInfo[] = "Coordinates: {$latitude}, {$longitude}";
+
 $pointsData = fetchWeatherData($pointsUrl, $errorMsg);
 $debugInfo[] = "Points API: " . ($pointsData ? "Success" : "Failed - " . $errorMsg);
 
@@ -132,8 +135,16 @@ if ($pointsData && isset($pointsData['properties'])) {
             $stationId = $stationsData['features'][0]['properties']['stationIdentifier'];
             $observationUrl = "https://api.weather.gov/stations/{$stationId}/observations/latest";
             $debugInfo[] = "Station ID: " . $stationId;
+            $debugInfo[] = "Observation URL: " . $observationUrl;
+        } else {
+            $debugInfo[] = "No station features found in stations data";
+            if ($stationsData) {
+                $debugInfo[] = "Available stations: " . count($stationsData['features'] ?? []);
+            }
         }
     }
+} else {
+    $debugInfo[] = "No points data properties found";
 }
 
 // Fetch current observations
@@ -141,6 +152,25 @@ $currentWeather = null;
 if ($observationUrl) {
     $currentWeather = fetchWeatherData($observationUrl, $errorMsg);
     $debugInfo[] = "Current Weather: " . ($currentWeather ? "Success" : "Failed - " . $errorMsg);
+    
+    // Debug: Show raw wind data structure
+    if ($currentWeather && isset($currentWeather['properties'])) {
+        $props = $currentWeather['properties'];
+        $debugInfo[] = "Raw Wind Speed Structure: " . json_encode($props['windSpeed'] ?? 'No wind speed data');
+        $debugInfo[] = "Raw Wind Direction Structure: " . json_encode($props['windDirection'] ?? 'No wind direction data');
+        $debugInfo[] = "Raw Wind Gust Structure: " . json_encode($props['windGust'] ?? 'No wind gust data');
+        
+        // Check wind speed units in API response
+        if (isset($props['windSpeed'])) {
+            $debugInfo[] = "Wind Speed Unit Code: " . ($props['windSpeed']['unitCode'] ?? 'Not specified');
+        }
+        
+        // Show sample of available properties for debugging
+        $availableProps = array_keys($props);
+        $debugInfo[] = "Available Properties: " . implode(', ', array_slice($availableProps, 0, 10)) . (count($availableProps) > 10 ? '...' : '');
+    }
+} else {
+    $debugInfo[] = "No observation URL available";
 }
 
 // Fetch forecast
@@ -176,38 +206,59 @@ $weatherData = [];
 if ($currentWeather && isset($currentWeather['properties'])) {
     $props = $currentWeather['properties'];
     
-    // Debug wind data
-    $debugInfo[] = "Raw Wind Speed Value: " . ($props['windSpeed']['value'] ?? 'NULL');
-    $debugInfo[] = "Raw Wind Direction Value: " . ($props['windDirection']['value'] ?? 'NULL');
-    
+    // Enhanced debug wind data
+    $debugInfo[] = "=== WIND DATA DEBUG ===";
+    $debugInfo[] = "Raw Wind Speed Value: " . (isset($props['windSpeed']['value']) ? $props['windSpeed']['value'] : 'NULL');
+    $debugInfo[] = "Raw Wind Direction Value: " . (isset($props['windDirection']['value']) ? $props['windDirection']['value'] : 'NULL');
+    $debugInfo[] = "Raw Wind Gust Value: " . (isset($props['windGust']['value']) ? $props['windGust']['value'] : 'NULL');
+    $debugInfo[] = "Wind Speed Type: " . (isset($props['windSpeed']['value']) ? gettype($props['windSpeed']['value']) : 'NULL');
+
     $weatherData = [
         'temperature' => celsiusToFahrenheit($props['temperature']['value']),
         'humidity' => $props['relativeHumidity']['value'] ? round($props['relativeHumidity']['value']) : null,
-        'windSpeed' => null,
-        'windDirection' => $props['windDirection']['value'],
-        'windDirectionCardinal' => null,
+        'windSpeed' => 0.0, // Default value
+        'windDirection' => $props['windDirection']['value'] ?? null,
+        'windDirectionCardinal' => 'N/A',
         'pressure' => $props['barometricPressure']['value'] ? round($props['barometricPressure']['value'] * 0.0002953, 2) : null,
         'dewPoint' => celsiusToFahrenheit($props['dewpoint']['value']),
         'visibility' => $props['visibility']['value'] ? round($props['visibility']['value'] * 0.000621371, 1) : null,
         'conditions' => $props['textDescription'] ?? null,
         'timestamp' => $props['timestamp'] ?? null
     ];
-    
-    // Calculate wind speed with proper conversion and null handling
+
+    // CORRECTED WIND SPEED CALCULATION - Assume km/h for NWS API
     if (isset($props['windSpeed']['value']) && $props['windSpeed']['value'] !== null) {
-        $windSpeedMs = $props['windSpeed']['value'];
-        // Convert m/s to mph: 1 m/s = 2.23694 mph
-        $weatherData['windSpeed'] = round($windSpeedMs * 2.23694, 1);
+        $windSpeedKmh = $props['windSpeed']['value'];
+        // Convert km/h to mph: 1 km/h = 0.621371 mph
+        $weatherData['windSpeed'] = round($windSpeedKmh * 0.621371, 1);
+        $debugInfo[] = "Wind Speed Conversion: {$windSpeedKmh} km/h × 0.621371 = {$weatherData['windSpeed']} mph";
+    } elseif (isset($props['windGust']['value']) && $props['windGust']['value'] !== null) {
+        // Fallback to wind gust if available
+        $windGustKmh = $props['windGust']['value'];
+        $weatherData['windSpeed'] = round($windGustKmh * 0.621371, 1);
+        $debugInfo[] = "Using wind gust as fallback: {$windGustKmh} km/h = {$weatherData['windSpeed']} mph";
+    } else {
+        $weatherData['windSpeed'] = 0.0;
+        $debugInfo[] = "No wind data available, defaulting to 0.0 mph";
     }
-    
+
     // Calculate wind direction cardinal
     if ($weatherData['windDirection'] !== null) {
         $directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
         $index = round($weatherData['windDirection'] / 22.5) % 16;
         $weatherData['windDirectionCardinal'] = $directions[$index];
+        $debugInfo[] = "Wind direction: {$weatherData['windDirection']}° = {$weatherData['windDirectionCardinal']}";
+    } else {
+        $weatherData['windDirectionCardinal'] = 'N/A';
+        $weatherData['windDirection'] = null;
+        $debugInfo[] = "No wind direction data available";
     }
     
-    $debugInfo[] = "Final Wind Speed: " . ($weatherData['windSpeed'] ?? 'NULL');
+    $debugInfo[] = "=== FINAL WEATHER DATA ===";
+    $debugInfo[] = "Final Wind Speed: " . $weatherData['windSpeed'] . " mph";
+    $debugInfo[] = "Final Wind Direction: " . ($weatherData['windDirectionCardinal'] ?? 'N/A');
+    $debugInfo[] = "Temperature: " . ($weatherData['temperature'] ?? 'N/A') . " °F";
+    $debugInfo[] = "Humidity: " . ($weatherData['humidity'] ?? 'N/A') . " %";
     
     // Archive the current reading if we have valid data
     if ($weatherData['temperature'] !== null) {
@@ -215,7 +266,11 @@ if ($currentWeather && isset($currentWeather['properties'])) {
         $archiveResult = archiveWeatherData($weatherData, $conditions);
         $debugInfo[] = "Archive: " . ($archiveResult ? "Success" : "Failed");
     }
+} else {
+    $debugInfo[] = "No current weather data available for processing";
 }
+
+$debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -486,6 +541,33 @@ if ($currentWeather && isset($currentWeather['properties'])) {
             color: #e17055;
         }
         
+        .debug-panel {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .debug-toggle {
+            background: #34495e;
+            color: #ecf0f1;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
+        .debug-toggle:hover {
+            background: #3d566e;
+        }
+        
         @media (max-width: 768px) {
             .conditions-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -628,19 +710,51 @@ if ($currentWeather && isset($currentWeather['properties'])) {
                         Error details: <?php echo htmlspecialchars($errorMsg); ?>
                     </p>
                 <?php endif; ?>
-                <?php if (!empty($debugInfo)): ?>
-                    <div style="margin-top: 15px; text-align: left; background: #f5f5f5; padding: 15px; border-radius: 5px; font-size: 0.85em; color: #333;">
-                        <strong>Debug Info:</strong><br>
-                        <?php foreach ($debugInfo as $info): ?>
-                            <?php echo htmlspecialchars($info); ?><br>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
                 <p style="margin-top: 10px;">
                     <span class="refresh-link" onclick="location.reload()">Refresh Page</span>
                 </p>
             </div>
         <?php endif; ?>
+        
+        <!-- Debug Panel -->
+        <div class="debug-panel">
+            <h3 style="margin-bottom: 15px; color: #ecf0f1;">Debug Information</h3>
+            <?php foreach ($debugInfo as $info): ?>
+                <div style="margin-bottom: 5px; padding: 3px 0; border-bottom: 1px solid #34495e;">
+                    <?php echo htmlspecialchars($info); ?>
+                </div>
+            <?php endforeach; ?>
+            
+            <?php if ($currentWeather && isset($currentWeather['properties'])): ?>
+                <div style="margin-top: 15px; padding: 10px; background: #34495e; border-radius: 5px;">
+                    <strong>Raw Wind Data Structure:</strong><br>
+                    <pre style="font-size: 0.8em; overflow-x: auto;"><?php echo htmlspecialchars(json_encode($currentWeather['properties']['windSpeed'] ?? 'No wind speed data', JSON_PRETTY_PRINT)); ?></pre>
+                </div>
+            <?php endif; ?>
+        </div>
+        
     </div>
+    
+    <script>
+        // Toggle debug panel visibility
+        function toggleDebug() {
+            const debugPanel = document.querySelector('.debug-panel');
+            if (debugPanel) {
+                debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+        
+        // Add toggle button
+        document.addEventListener('DOMContentLoaded', function() {
+            const debugPanel = document.querySelector('.debug-panel');
+            if (debugPanel) {
+                const toggleBtn = document.createElement('button');
+                toggleBtn.textContent = 'Toggle Debug Info';
+                toggleBtn.className = 'debug-toggle';
+                toggleBtn.onclick = toggleDebug;
+                debugPanel.parentNode.insertBefore(toggleBtn, debugPanel);
+            }
+        });
+    </script>
 </body>
 </html>
