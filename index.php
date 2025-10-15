@@ -114,20 +114,58 @@ function getCurrentLocalTime() {
 
 // Calculate next refresh time for display
 $nextRefreshTime = date('g:i A T', time() + 300);
+
+// Process current weather data
+$weatherData = [];
+if ($currentWeather && isset($currentWeather['properties'])) {
+    $props = $currentWeather['properties'];
+    
+    // Debug wind data
+    $debugInfo[] = "Raw Wind Speed Value: " . ($props['windSpeed']['value'] ?? 'NULL');
+    $debugInfo[] = "Raw Wind Direction Value: " . ($props['windDirection']['value'] ?? 'NULL');
+    
+    $weatherData = [
+        'temperature' => celsiusToFahrenheit($props['temperature']['value']),
+        'humidity' => $props['relativeHumidity']['value'] ? round($props['relativeHumidity']['value']) : null,
+        'windSpeed' => null,
+        'windDirection' => $props['windDirection']['value'],
+        'windDirectionCardinal' => null,
+        'pressure' => $props['barometricPressure']['value'] ? round($props['barometricPressure']['value'] * 0.0002953, 2) : null,
+        'dewPoint' => celsiusToFahrenheit($props['dewpoint']['value']),
+        'visibility' => $props['visibility']['value'] ? round($props['visibility']['value'] * 0.000621371, 1) : null,
+        'conditions' => $props['textDescription'] ?? null,
+        'timestamp' => $props['timestamp'] ?? null
+    ];
+    
+    // Calculate wind speed with proper conversion and null handling
+    if (isset($props['windSpeed']['value']) && $props['windSpeed']['value'] !== null) {
+        $windSpeedMs = $props['windSpeed']['value'];
+        // Convert m/s to mph: 1 m/s = 2.23694 mph
+        $weatherData['windSpeed'] = round($windSpeedMs * 2.23694, 1);
+    }
+    
+    // Calculate wind direction cardinal
+    if ($weatherData['windDirection'] !== null) {
+        $directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+        $index = round($weatherData['windDirection'] / 22.5) % 16;
+        $weatherData['windDirectionCardinal'] = $directions[$index];
+    }
+    
+    $debugInfo[] = "Final Wind Speed: " . ($weatherData['windSpeed'] ?? 'NULL');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KSAT Weather Dashboard</title>
+    <title>ASAI Weather Dashboard</title>
     <script>
         // Auto-refresh every 5 minutes (300000 milliseconds)
         let secondsLeft = 300;
         
         // Function to reload the page
         function refreshPage() {
-            // Add cache-busting parameter to ensure fresh data
             const timestamp = new Date().getTime();
             const url = window.location.href.split('?')[0] + '?t=' + timestamp;
             window.location.href = url;
@@ -162,239 +200,302 @@ $nextRefreshTime = date('g:i A T', time() + 300);
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            background: white;
+            color: #333;
+            line-height: 1.6;
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
+            padding: 20px;
         }
         
         .header {
             text-align: center;
-            color: white;
             margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 20px;
         }
         
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            font-size: 2.2em;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-weight: 600;
         }
         
         .header p {
             font-size: 1.1em;
-            opacity: 0.9;
+            color: #7f8c8d;
         }
         
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+        .current-conditions {
             margin-bottom: 30px;
         }
         
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
+        .conditions-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: #e0e0e0;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
         }
         
-        .card:hover {
-            transform: translateY(-5px);
+        .condition-item {
+            background: white;
+            padding: 20px;
+            text-align: center;
         }
         
-        .card h3 {
-            color: #667eea;
-            font-size: 0.9em;
+        .condition-label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #7f8c8d;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             margin-bottom: 10px;
         }
         
-        .card .value {
-            font-size: 2.5em;
+        .condition-value {
+            font-size: 2em;
             font-weight: bold;
-            color: #333;
-            margin: 10px 0;
+            color: #2c3e50;
+            margin-bottom: 5px;
         }
         
-        .card .unit {
+        .condition-unit {
             font-size: 0.9em;
-            color: #666;
+            color: #7f8c8d;
+        }
+        
+        .wind-direction {
+            font-size: 1.4em;
+            margin-bottom: 5px;
+        }
+        
+        .secondary-conditions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .secondary-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .secondary-label {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #7f8c8d;
+            margin-bottom: 8px;
+        }
+        
+        .secondary-value {
+            font-size: 1.6em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .secondary-unit {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-left: 2px;
+        }
+        
+        .divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 30px 0;
         }
         
         .forecast-section {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
         }
         
         .forecast-section h2 {
-            color: #667eea;
+            font-size: 1.4em;
+            color: #2c3e50;
             margin-bottom: 20px;
+            font-weight: 600;
         }
         
         .forecast-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(7, 1fr);
             gap: 15px;
         }
         
         .forecast-item {
             background: #f8f9fa;
             padding: 15px;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .forecast-item h4 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .forecast-item p {
-            color: #666;
-            font-size: 0.9em;
-            line-height: 1.5;
-        }
-        
-        .error {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 30px;
+            border-radius: 8px;
             text-align: center;
-            color: #d32f2f;
+            border: 1px solid #e9ecef;
+        }
+        
+        .forecast-day {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .forecast-temp {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 8px;
+        }
+        
+        .forecast-condition {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            margin-bottom: 8px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .forecast-wind {
+            font-size: 0.8em;
+            color: #7f8c8d;
         }
         
         .timestamp {
             text-align: center;
-            color: white;
-            margin-top: 20px;
-            font-size: 0.9em;
-            opacity: 0.8;
+            color: #7f8c8d;
+            font-size: 0.85em;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
         }
         
-        .temp-high { color: #d32f2f; }
-        .temp-low { color: #1976d2; }
-        
         .refresh-link {
-            color: white;
+            color: #3498db;
             text-decoration: underline;
             cursor: pointer;
         }
         
         .refresh-link:hover {
-            opacity: 0.8;
+            color: #2980b9;
+        }
+        
+        .error {
+            background: #ffeaa7;
+            border: 1px solid #fdcb6e;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            color: #e17055;
+        }
+        
+        @media (max-width: 768px) {
+            .conditions-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .secondary-conditions {
+                grid-template-columns: 1fr;
+            }
+            
+            .forecast-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .conditions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .forecast-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🌤️ KSAT Weather Dashboard</h1>
+            <h1>ASAI Weather Dashboard</h1>
             <p>San Antonio, Texas - National Weather Service Data</p>
         </div>
         
-        <?php if ($currentWeather && isset($currentWeather['properties'])): ?>
-            <?php $props = $currentWeather['properties']; ?>
-            
-            <div class="dashboard">
-                <div class="card">
-                    <h3>Temperature</h3>
-                    <div class="value">
-                        <?php 
-                        $tempF = celsiusToFahrenheit($props['temperature']['value']);
-                        echo $tempF ? $tempF : 'N/A';
-                        ?>
+        <?php if (!empty($weatherData)): ?>
+            <div class="current-conditions">
+                <div class="conditions-grid">
+                    <div class="condition-item">
+                        <div class="condition-label">Temperature</div>
+                        <div class="condition-value">
+                            <?php echo $weatherData['temperature'] ?? 'N/A'; ?>
+                        </div>
+                        <div class="condition-unit">°F</div>
                     </div>
-                    <div class="unit">°F</div>
+                    
+                    <div class="condition-item">
+                        <div class="condition-label">Humidity</div>
+                        <div class="condition-value">
+                            <?php echo $weatherData['humidity'] ?? 'N/A'; ?>
+                        </div>
+                        <div class="condition-unit">%</div>
+                    </div>
+                    
+                    <div class="condition-item">
+                        <div class="condition-label">Wind Speed</div>
+                        <div class="condition-value">
+                            <?php echo $weatherData['windSpeed'] ?? '0.0'; ?>
+                        </div>
+                        <div class="condition-unit">mph</div>
+                    </div>
+                    
+                    <div class="condition-item">
+                        <div class="condition-label">Wind Direction</div>
+                        <div class="wind-direction">
+                            <?php echo $weatherData['windDirectionCardinal'] ?? 'N/A'; ?>
+                        </div>
+                        <div class="condition-unit">
+                            <?php echo $weatherData['windDirection'] ? round($weatherData['windDirection']) . '°' : ''; ?>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="card">
-                    <h3>Humidity</h3>
-                    <div class="value">
-                        <?php echo $props['relativeHumidity']['value'] ? round($props['relativeHumidity']['value']) : 'N/A'; ?>
+                <div class="secondary-conditions">
+                    <div class="secondary-item">
+                        <div class="secondary-label">Barometric Pressure</div>
+                        <div class="secondary-value">
+                            <?php echo $weatherData['pressure'] ?? 'N/A'; ?>
+                            <span class="secondary-unit">inHg</span>
+                        </div>
                     </div>
-                    <div class="unit">%</div>
-                </div>
-                
-                <div class="card">
-                    <h3>Wind Speed</h3>
-                    <div class="value">
-                        <?php 
-                        $windSpeed = $props['windSpeed']['value'];
-                        // Convert m/s to mph
-                        echo $windSpeed ? round($windSpeed * 2.237, 1) : 'N/A';
-                        ?>
+                    
+                    <div class="secondary-item">
+                        <div class="secondary-label">Dew Point</div>
+                        <div class="secondary-value">
+                            <?php echo $weatherData['dewPoint'] ?? 'N/A'; ?>
+                            <span class="secondary-unit">°F</span>
+                        </div>
                     </div>
-                    <div class="unit">mph</div>
-                </div>
-                
-                <div class="card">
-                    <h3>Wind Direction</h3>
-                    <div class="value" style="font-size: 1.8em;">
-                        <?php 
-                        $windDir = $props['windDirection']['value'];
-                        if ($windDir !== null) {
-                            $directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-                            $index = round($windDir / 22.5) % 16;
-                            echo $directions[$index];
-                        } else {
-                            echo 'N/A';
-                        }
-                        ?>
-                    </div>
-                    <div class="unit"><?php echo $windDir ? round($windDir) . '°' : ''; ?></div>
-                </div>
-                
-                <div class="card">
-                    <h3>Barometric Pressure</h3>
-                    <div class="value">
-                        <?php 
-                        $pressure = $props['barometricPressure']['value'];
-                        // Convert Pa to inHg
-                        echo $pressure ? round($pressure * 0.0002953, 2) : 'N/A';
-                        ?>
-                    </div>
-                    <div class="unit">inHg</div>
-                </div>
-                
-                <div class="card">
-                    <h3>Dew Point</h3>
-                    <div class="value">
-                        <?php 
-                        $dewF = celsiusToFahrenheit($props['dewpoint']['value']);
-                        echo $dewF ? $dewF : 'N/A';
-                        ?>
-                    </div>
-                    <div class="unit">°F</div>
-                </div>
-                
-                <div class="card">
-                    <h3>Visibility</h3>
-                    <div class="value">
-                        <?php 
-                        $visibility = $props['visibility']['value'];
-                        // Convert meters to miles
-                        echo $visibility ? round($visibility * 0.000621371, 1) : 'N/A';
-                        ?>
-                    </div>
-                    <div class="unit">miles</div>
-                </div>
-                
-                <div class="card">
-                    <h3>Conditions</h3>
-                    <div class="value" style="font-size: 1.5em;">
-                        <?php echo $props['textDescription'] ?? 'N/A'; ?>
+                    
+                    <div class="secondary-item">
+                        <div class="secondary-label">Visibility</div>
+                        <div class="secondary-value">
+                            <?php echo $weatherData['visibility'] ?? 'N/A'; ?>
+                            <span class="secondary-unit">miles</span>
+                        </div>
                     </div>
                 </div>
             </div>
+            
+            <div class="divider"></div>
             
             <?php if ($forecast && isset($forecast['properties']['periods'])): ?>
                 <div class="forecast-section">
@@ -402,14 +503,10 @@ $nextRefreshTime = date('g:i A T', time() + 300);
                     <div class="forecast-grid">
                         <?php foreach (array_slice($forecast['properties']['periods'], 0, 7) as $period): ?>
                             <div class="forecast-item">
-                                <h4><?php echo htmlspecialchars($period['name']); ?></h4>
-                                <p>
-                                    <strong class="temp-high"><?php echo $period['temperature']; ?>°<?php echo $period['temperatureUnit']; ?></strong>
-                                </p>
-                                <p><?php echo htmlspecialchars($period['shortForecast']); ?></p>
-                                <p style="margin-top: 10px; font-size: 0.85em;">
-                                    💨 <?php echo htmlspecialchars($period['windSpeed'] . ' ' . $period['windDirection']); ?>
-                                </p>
+                                <div class="forecast-day"><?php echo htmlspecialchars($period['name']); ?></div>
+                                <div class="forecast-temp"><?php echo $period['temperature']; ?>°<?php echo $period['temperatureUnit']; ?></div>
+                                <div class="forecast-condition"><?php echo htmlspecialchars($period['shortForecast']); ?></div>
+                                <div class="forecast-wind">💨 <?php echo htmlspecialchars($period['windSpeed'] . ' ' . $period['windDirection']); ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -417,7 +514,7 @@ $nextRefreshTime = date('g:i A T', time() + 300);
             <?php endif; ?>
             
             <div class="timestamp">
-                Station Updated: <?php echo formatTimestamp($props['timestamp']); ?> | 
+                Station Updated: <?php echo formatTimestamp($weatherData['timestamp']); ?> | 
                 Page Loaded: <?php echo date('g:i A T'); ?> | 
                 Next Refresh: <span id="countdown">5:00</span> (<?php echo $nextRefreshTime; ?>) | 
                 <span class="refresh-link" onclick="refreshPage()">Refresh Now</span>
