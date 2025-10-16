@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  web:
+    image: ldhagen/ksat-weather-app:latest
+    ports:
+      - "8085:80"
+    environment:
+      - TZ=America/Chicago
+      - DB_HOST=db
+      - DB_NAME=weather_db
+      - DB_USER=weather_user
+      - DB_PASS=weather_pass
+    depends_on:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_pass
+      - MYSQL_DATABASE=weather_db
+      - MYSQL_USER=weather_user
+      - MYSQL_PASSWORD=weather_pass
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  cron:
+    image: ldhagen/ksat-weather-app:latest
+    command: >
+      sh -c "
+      echo '*/5 * * * * /usr/local/bin/php /var/www/html/cron_fetch_weather.php > /dev/null 2>&1' > /etc/cron.d/weather-cron &&
+      chmod 0644 /etc/cron.d/weather-cron &&
+      crontab /etc/cron.d/weather-cron &&
+      cron -f"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db_data:
