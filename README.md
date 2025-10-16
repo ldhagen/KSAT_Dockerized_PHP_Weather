@@ -263,7 +263,7 @@ PHP and MySQL communities
 
 Version: 2.0.0
 Last Updated: 2024
-Maintainer: KSAT Weather Team
+Maintainer: Lance Hagen
 
 For support or questions, please check the troubleshooting section or open an issue in the repository.
 
