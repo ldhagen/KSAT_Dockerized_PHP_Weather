@@ -6,9 +6,10 @@ RUN a2enmod rewrite
 # Install required PHP extensions and MySQL support
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Install additional tools
+# Install additional tools including cron
 RUN apt-get update && apt-get install -y \
     curl \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory

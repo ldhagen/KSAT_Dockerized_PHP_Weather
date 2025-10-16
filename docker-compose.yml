@@ -1,4 +1,3 @@
-# docker-compose.yml
 version: '3.8'
 
 services:
@@ -28,6 +27,20 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  cron:
+    build: .
+    volumes:
+      - ./:/var/www/html
+    command: >
+      sh -c "
+      echo '*/5 * * * * /usr/local/bin/php /var/www/html/cron_fetch_weather.php > /dev/null 2>&1' > /etc/cron.d/weather-cron &&
+      chmod 0644 /etc/cron.d/weather-cron &&
+      crontab /etc/cron.d/weather-cron &&
+      cron -f"
+    depends_on:
+      - db
     restart: unless-stopped
 
 volumes:
