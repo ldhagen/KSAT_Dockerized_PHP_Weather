@@ -2,11 +2,9 @@ version: '3.8'
 
 services:
   web:
-    build: .
+    image: ldhagen/ksat-weather-app:latest
     ports:
       - "8085:80"
-    volumes:
-      - ./:/var/www/html
     environment:
       - TZ=America/Chicago
       - DB_HOST=db
@@ -16,6 +14,11 @@ services:
     depends_on:
       - db
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   db:
     image: mysql:8.0
@@ -28,11 +31,13 @@ services:
       - db_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uweather_user", "-pweather_pass"]
+      timeout: 20s
+      retries: 10
 
   cron:
-    build: .
-    volumes:
-      - ./:/var/www/html
+    image: ldhagen/ksat-weather-app:latest
     command: >
       sh -c "
       echo '*/5 * * * * /usr/local/bin/php /var/www/html/cron_fetch_weather.php > /dev/null 2>&1' > /etc/cron.d/weather-cron &&
@@ -40,7 +45,8 @@ services:
       crontab /etc/cron.d/weather-cron &&
       cron -f"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
