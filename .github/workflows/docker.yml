@@ -5,6 +5,9 @@ on:
     branches: [ main ]
     tags: [ 'v*' ]
 
+env:
+  IMAGE_NAME: ldhagen/ksat-weather-app
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,13 +29,13 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: ldhagen/ksat-weather-app
+        images: ${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
-          type=sha,prefix={{branch}}-
+          type=sha,prefix=git-
         
     - name: Build and push
       uses: docker/build-push-action@v4
