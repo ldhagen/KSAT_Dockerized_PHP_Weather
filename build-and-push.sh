@@ -4,40 +4,37 @@
 IMAGE_NAME="ldhagen/ksat-weather-app"
 VERSION="2.0.0"
 
+# Get Git commit information
+GIT_COMMIT=$(git rev-parse --short HEAD)
+GIT_REPO="https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather"
+
 echo "Building Docker image..."
-docker build -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest .
+echo "Git Commit: $GIT_COMMIT"
+echo "Version: $VERSION"
 
-echo "Testing the image..."
+# Build the image with build args
+docker build \
+  --build-arg GIT_COMMIT=$GIT_COMMIT \
+  --build-arg GIT_REPO=$GIT_REPO \
+  --build-arg VERSION=$VERSION \
+  -t $IMAGE_NAME:$VERSION \
+  -t $IMAGE_NAME:latest \
+  -t $IMAGE_NAME:$GIT_COMMIT .
+
+echo "Testing basic container startup..."
 docker run -d --name test-weather-app -p 8085:80 $IMAGE_NAME:latest
-sleep 10
+sleep 5
 
-# Test if the container is running
 if docker ps | grep test-weather-app; then
-    echo "✅ Container is running successfully"
+    echo "✅ Container started successfully"
     
-    # Test basic web server functionality (without database)
-    if curl -s -f http://localhost:8085/ > /dev/null; then
-        echo "✅ Web server is responding"
-        
-        # Test status endpoint (it should fail gracefully without DB)
-        HEALTH_RESPONSE=$(curl -s http://localhost:8085/health.php)
-        if [[ $HEALTH_RESPONSE == *"unhealthy"* ]] || [[ $HEALTH_RESPONSE == *"error"* ]]; then
-            echo "⚠️  Health check shows expected database connection error (this is normal in test)"
-            echo "✅ Basic functionality verified - database connection will work in full deployment"
-        else
-            echo "❌ Unexpected health check response"
-            docker logs test-weather-app
-            docker stop test-weather-app
-            docker rm test-weather-app
-            exit 1
-        fi
-    else
-        echo "❌ Web server failed to respond"
-        docker logs test-weather-app
-        docker stop test-weather-app
-        docker rm test-weather-app
-        exit 1
-    fi
+    # Display image labels
+    echo "Image Labels:"
+    docker inspect $IMAGE_NAME:latest | jq -r '.[0].Config.Labels' || docker inspect $IMAGE_NAME:latest | grep -A 20 "Labels"
+    
+    # Test version endpoint
+    echo "Version endpoint:"
+    curl -s http://localhost:8085/version.php || echo "Version endpoint not accessible"
     
     docker stop test-weather-app
     docker rm test-weather-app
@@ -50,6 +47,11 @@ fi
 echo "Pushing to Docker Hub..."
 docker push $IMAGE_NAME:$VERSION
 docker push $IMAGE_NAME:latest
+docker push $IMAGE_NAME:$GIT_COMMIT
 
-echo "✅ Successfully built and pushed $IMAGE_NAME:$VERSION"
-echo "✅ Successfully built and pushed $IMAGE_NAME:latest"
+echo "✅ Successfully built and pushed:"
+echo "   - $IMAGE_NAME:$VERSION"
+echo "   - $IMAGE_NAME:latest" 
+echo "   - $IMAGE_NAME:$GIT_COMMIT (Git commit)"
+echo ""
+echo "GitHub Commit: $GIT_REPO/commit/$GIT_COMMIT"

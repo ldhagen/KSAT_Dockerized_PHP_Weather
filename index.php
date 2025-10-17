@@ -758,3 +758,10 @@ $debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
     </script>
 </body>
 </html>
+<div class="version-info" style="text-align: center; margin-top: 20px; color: #7f8c8d; font-size: 0.8em;">
+    v2.0.0 | 
+    <a href="https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather/commit/<?php echo $GIT_COMMIT; ?>" 
+       target="_blank" style="color: #7f8c8d;">
+       Build: <?php echo substr($GIT_COMMIT, 0, 7); ?>
+    </a>
+</div>
