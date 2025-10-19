@@ -136,6 +136,10 @@ if ($forecastUrl) {
 // We are trusting the cron job to update every 5 minutes (300 seconds)
 $nextRefreshTime = date('g:i A T', time() + 300);
 
+// Get version information
+$VERSION = @file_get_contents('version.txt') ?: '2.1.0';
+$VERSION = trim($VERSION);
+
 // Process current weather data from local database
 $weatherData = [];
 if ($latestReading) {
@@ -166,6 +170,24 @@ if ($latestReading) {
 }
 
 // **ARCHIVE STEP REMOVED - THIS IS THE KEY FIX**
+
+// Get Git commit information for version display
+$GIT_COMMIT = $_ENV['GIT_COMMIT'] ?? 
+              (function() {
+                  $commit = @shell_exec('git rev-parse --short HEAD');
+                  return $commit ? trim($commit) : null;
+              })();
+
+// Determine GitHub URL and display text
+if ($GIT_COMMIT && preg_match('/^[a-f0-9]{7,40}$/i', $GIT_COMMIT)) {
+    // Valid commit hash - link to specific commit
+    $githubUrl = "https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather/commit/{$GIT_COMMIT}";
+    $buildText = substr($GIT_COMMIT, 0, 7);
+} else {
+    // No valid commit - link to main branch
+    $githubUrl = "https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather";
+    $buildText = 'main';
+}
 
 $debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
 ?>
@@ -660,9 +682,9 @@ $debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
 </body>
 </html>
 <div class="version-info" style="text-align: center; margin-top: 20px; color: #7f8c8d; font-size: 0.8em;">
-    v2.0.0 | 
-    <a href="https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather/commit/<?php echo $GIT_COMMIT; ?>" 
+    v<?php echo $VERSION; ?> | 
+    <a href="<?php echo $githubUrl; ?>" 
        target="_blank" style="color: #7f8c8d;">
-       Build: <?php echo substr($GIT_COMMIT, 0, 7); ?>
+       Build: <?php echo $buildText; ?>
     </a>
 </div>
