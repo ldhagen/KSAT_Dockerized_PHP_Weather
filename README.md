@@ -1,6 +1,25 @@
-KSAT Dockerized PHP Weather DashboardA comprehensive weather monitoring and visualization system built with PHP, MySQL, and Docker. This application provides near real-time weather data, historical analysis, and interactive charts for San Antonio, Texas using the National Weather Service API.🚀 Quick DeploymentDeploy with Docker (Recommended)Bash# One-command deployment
-curl -fsSL https://raw.githubusercontent.com/ldhagen/KSAT_Dockerized_PHP_Weather/main/deploy.sh | bash
-Or manually (Ensure file separation for security and stability):Bash# Create deployment directory
+# KSAT Dockerized PHP Weather Dashboard
+
+![Docker Build Status](https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather/actions/workflows/docker.yml/badge.svg)
+![Docker Pulls](https://img.shields.io/docker/pulls/ldhagen/ksat-weather-app)
+![Docker Image Version](https://img.shields.io/docker/v/ldhagen/ksat-weather-app)
+![GitHub](https://img.shields.io/github/license/ldhagen/KSAT_Dockerized_PHP_Weather)
+
+A comprehensive weather monitoring and visualization system built with PHP, MySQL, and Docker. This application provides near real-time weather data, historical analysis, and interactive charts for San Antonio, Texas using the National Weather Service API.
+
+---
+
+## 🚀 Quick Deployment
+
+### Deploy with Docker (Recommended)
+
+```bash
+# One-command deployment
+curl -fsSL [https://raw.githubusercontent.com/ldhagen/KSAT_Dockerized_PHP_Weather/main/deploy.sh](https://raw.githubusercontent.com/ldhagen/KSAT_Dockerized_PHP_Weather/main/deploy.sh) | bash
+
+Or manually (Ensure file separation for security and stability):
+
+# Create deployment directory
 mkdir ksat-weather && cd ksat-weather
 
 # Download deployment files (docker-compose.yml, init.sql, etc.)
@@ -13,8 +32,10 @@ mv cron_fetch_weather.php cron-scripts/
 # Start the application
 docker-compose up -d
 Access the dashboard: http://localhost:8085
-🌟 FeaturesCurrent WeatherReal-time weather conditions read from local MySQL database (updated by the cron job).Temperature, humidity, wind speed/direction, pressure, dew point, and visibility.7-day weather forecast.Auto-refresh every 5 minutes in browser.Automated Data CollectionContinuous automated storage of all weather readings.Frequency: Exactly Every 5 minutes, regardless of web traffic, ensuring API rate limit compliance.Data Integrity: No gaps in historical records.MySQL database with proper indexing.Data ArchivingPaginated archive view with date filtering.Export-ready data structure.Interactive ChartsMultiple chart types (line, combo, time series).Temperature, humidity, wind speed, pressure trends.Date range filtering.Statistical summaries.Mobile-responsive chart layouts.Technical FeaturesDocker containerization with multi-service architecture.Secure Cron Job: Data collection script (cron_fetch_weather.php) runs from a non-web-accessible directory (/app) within the container.MySQL database persistence.Automated cron-based data collection.CI/CD with GitHub Actions.Error handling and logging.RESTful API integration.Cache control and performance optimization.📦 Docker ImagesServiceImageDescriptionWeb Appldhagen/ksat-weather-app:latestPHP/Apache web application serving index.php and archive.php.Databasemysql:8.0MySQL database with persistent storage.Cronldhagen/ksat-weather-app:latestAutomated data collection isolated from web traffic.🔧 DevelopmentPrerequisitesDocker and Docker ComposeGitLocal DevelopmentBash# Clone the repository
-git clone https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather.git
+
+
+🌟 FeaturesCurrent WeatherReal-time weather conditions read from local MySQL database (updated by the cron job).Temperature, humidity, wind speed/direction, pressure, dew point, and visibility.7-day weather forecast.Auto-refresh every 5 minutes in browser.Automated Data CollectionContinuous automated storage of all weather readings.Frequency: Exactly Every 5 minutes, regardless of web traffic, ensuring API rate limit compliance.Data Integrity: No gaps in historical records.Data ArchivingPaginated archive view with date filtering.Export-ready data structure.Interactive ChartsMultiple chart types (line, combo, time series).Temperature, humidity, wind speed, pressure trends.Technical FeaturesDocker containerization with multi-service architecture.Secure Cron Job: Data collection script (cron_fetch_weather.php) runs from a non-web-accessible directory (/app) within the container.MySQL database persistence.Automated cron-based data collection.Error handling and logging.📦 Docker ImagesServiceImageDescriptionWeb Appldhagen/ksat-weather-app:latestPHP/Apache web application serving index.php and archive.php.Databasemysql:8.0MySQL database with persistent storage.Cronldhagen/ksat-weather-app:latestAutomated data collection isolated from web traffic.🔧 DevelopmentPrerequisitesDocker and Docker ComposeGitLocal DevelopmentBash# Clone the repository
+git clone [https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather.git](https://github.com/ldhagen/KSAT_Dockerized_PHP_Weather.git)
 cd KSAT_Dockerized_PHP_Weather
 
 # ⚠️ Essential Step for Separation/Security ⚠️
@@ -39,7 +60,7 @@ Project StructurePlaintextKSAT_Dockerized_PHP_Weather/
 ├── cron-scripts/               # 🆕 NEW: Secure directory for background tasks
 │   └── cron_fetch_weather.php  # Automated data collection (NO LONGER web-accessible)
 └── README.md                   # This file
-🔄 Automated Data CollectionThe system features continuous data collection that runs independently of user visits:Frequency: Every 5 minutes.Method: Dockerized cron service using a secure, non-web path.Reliability: Runs even when no browsers are open.MonitoringBash# Check cron service logs (shows execution output due to improved logging)
+🔄 Automated Data CollectionThe system features continuous data collection that runs independently of user visits:Frequency: Every 5 minutes.Method: Dockerized cron service using a secure, non-web path.MonitoringBash# Check cron service logs (shows execution output due to improved logging)
 docker-compose logs -f cron
 
 # Verify data collection
