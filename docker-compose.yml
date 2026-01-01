@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # All services must be indented under this 'services' key
   web:
