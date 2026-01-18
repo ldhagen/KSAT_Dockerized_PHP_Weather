@@ -47,7 +47,7 @@ services:
       - ./config.php:/app/config.php
     command: >
       sh -c "
-      echo '*/5 * * * * /usr/local/bin/php /app/cron_fetch_weather.php > /proc/1/fd/1 2>&1' > /etc/cron.d/weather-cron &&
+      echo '*/15 * * * * /usr/local/bin/php /app/cron_fetch_weather.php > /proc/1/fd/1 2>&1' > /etc/cron.d/weather-cron &&
       chmod 0644 /etc/cron.d/weather-cron &&
       crontab /etc/cron.d/weather-cron &&
       exec cron -f" # Using 'exec' to ensure the container stays running
