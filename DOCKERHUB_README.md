@@ -27,7 +27,7 @@ Features
 
 📊 Interactive charts and historical data
 
-🔄 Automated data collection every 5 minutes
+🔄 Automated data collection every 15 minutes
 
 🗄️ MySQL database with persistent storage
 

@@ -101,7 +101,7 @@ $errorMsg = '';
 $debugInfo = [];
 $debugInfo[] = "Script started at: " . date('Y-m-d H:i:s T');
 $debugInfo[] = "Coordinates: {$latitude}, {$longitude}";
-$debugInfo[] = "Current Data Source: Local Database (Updated by cron job every 5 minutes)";
+$debugInfo[] = "Current Data Source: Local Database (Updated by cron job every 15 minutes)";
 
 // Step 1: Get latest reading from local DB
 $latestReading = getLatestReading();
@@ -133,8 +133,8 @@ if ($forecastUrl) {
 
 
 // Calculate next refresh time for display
-// We are trusting the cron job to update every 5 minutes (300 seconds)
-$nextRefreshTime = date('g:i A T', time() + 300);
+// We are trusting the cron job to update every 15 minutes (900 seconds)
+$nextRefreshTime = date('g:i A T', time() + 900);
 
 // Get version information
 $VERSION = @file_get_contents('version.txt') ?: '2.1.0';
@@ -198,8 +198,8 @@ $debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ASAI Weather Dashboard</title>
     <script>
-        // Auto-refresh every 5 minutes (300000 milliseconds)
-        let secondsLeft = 300;
+        // Auto-refresh every 15 minutes (900000 milliseconds)
+        let secondsLeft = 900;
         
         // Function to reload the page
         function refreshPage() {
@@ -211,7 +211,7 @@ $debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
         
         // Set the main refresh timeout
         // This causes the browser to refresh, which is still desirable for a dashboard.
-        setTimeout(refreshPage, 300000);
+        setTimeout(refreshPage, 900000);
         
         // Update countdown timer every second
         setInterval(function() {
@@ -619,7 +619,7 @@ $debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
             <div class="timestamp">
                 Data Updated: <?php echo formatTimestamp($weatherData['timestamp']); ?> | 
                 Page Loaded: <?php echo date('g:i A T'); ?> | 
-                Next Page Refresh: <span id="countdown">5:00</span> (<?php echo $nextRefreshTime; ?>) | 
+                Next Page Refresh: <span id="countdown">15:00</span> (<?php echo $nextRefreshTime; ?>) | 
                 <span class="refresh-link" onclick="refreshPage()">Refresh Now</span>
             </div>
             
@@ -627,7 +627,7 @@ $debugInfo[] = "Script completed at: " . date('Y-m-d H:i:s T');
             <div class="error">
                 <h2>⚠️ Unable to display weather data</h2>
                 <p>No recent weather data available in the local database.</p>
-                <p>Please ensure your background cron job is running correctly every 5 minutes and archiving data.</p>
+                <p>Please ensure your background cron job is running correctly every 15 minutes and archiving data.</p>
                 <?php if ($errorMsg): ?>
                     <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
                         Forecast Error details: <?php echo htmlspecialchars($errorMsg); ?>

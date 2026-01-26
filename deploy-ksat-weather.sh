@@ -32,5 +32,5 @@ echo "   View logs: docker compose logs -f"
 echo "   Check status: docker compose ps"
 echo "   Stop: docker compose down"
 echo ""
-echo "⏰ Weather data will be automatically collected every 5 minutes"
+echo "⏰ Weather data will be automatically collected every 15 minutes"
 

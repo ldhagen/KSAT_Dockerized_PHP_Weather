@@ -1,5 +1,4 @@
 services:
-  # All services must be indented under this 'services' key
   web:
     image: ldhagen/ksat-weather-app:latest
     ports:
@@ -15,7 +14,12 @@ services:
       - ./archive.php:/var/www/html/archive.php
       - ./config.php:/var/www/html/config.php
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - weather-web
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
@@ -33,15 +37,23 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      default:
+        aliases:
+          - db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uweather_user", "-pweather_pass"]
       timeout: 20s
       retries: 10
 
-  # 👈 This 'cron' entry must align with 'web' and 'db'
   cron:
     image: ldhagen/ksat-weather-app:latest
+    environment:
+      - DB_HOST=db
+      - DB_NAME=weather_db
+      - DB_USER=weather_user
+      - DB_PASS=weather_pass
     volumes:
       - ./cron-scripts/cron_fetch_weather.php:/app/cron_fetch_weather.php
       - ./config.php:/app/config.php
@@ -50,7 +62,7 @@ services:
       echo '*/15 * * * * /usr/local/bin/php /app/cron_fetch_weather.php > /proc/1/fd/1 2>&1' > /etc/cron.d/weather-cron &&
       chmod 0644 /etc/cron.d/weather-cron &&
       crontab /etc/cron.d/weather-cron &&
-      exec cron -f" # Using 'exec' to ensure the container stays running
+      exec cron -f"
     depends_on:
       db:
         condition: service_healthy

@@ -40,7 +40,7 @@ services:
     image: ldhagen/ksat-weather-app:latest
     command: >
       sh -c "
-      echo '*/5 * * * * /usr/local/bin/php /var/www/html/cron_fetch_weather.php > /dev/null 2>&1' > /etc/cron.d/weather-cron &&
+      echo '*/15 * * * * /usr/local/bin/php /var/www/html/cron_fetch_weather.php > /dev/null 2>&1' > /etc/cron.d/weather-cron &&
       chmod 0644 /etc/cron.d/weather-cron &&
       crontab /etc/cron.d/weather-cron &&
       cron -f"

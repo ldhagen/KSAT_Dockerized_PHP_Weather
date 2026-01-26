@@ -53,7 +53,7 @@ Access the dashboard: http://localhost:8085
 ### Current Weather
 
 * Real-time weather conditions **read from local MySQL database**.
-* Automated data collection exactly **every 5 minutes**.
+* Automated data collection exactly **every 15 minutes**.
 * Interactive charts and paginated historical archive.
 * 
 **Secure Architecture:** Background tasks run from non-web-accessible directories.
